@@ -68,6 +68,98 @@ delta2 = backwards(delta1,params,'output',linear_deriv)
 # Implement backwards!
 backwards(delta2,params,'layer1',sigmoid_deriv)
 
+# Q 2.5 should be implemented in this file
+# you can do this before or after training the network.
+
+# save the old params
+import copy
+params_orig = copy.deepcopy(params)
+
+eps = 1e-6
+for k,v in params.items():
+    if '_' in k:
+        continue
+    # we have a real parameter!
+    # for each value inside the parameter
+    print(k)
+    if 'W' in k:
+        m,n = params[k].shape
+        for i in range(m):
+            for j in range(n):
+                # add epsilon
+                params[k][i][j] = params_orig[k][i][j] + eps
+
+                # run the network
+                xb,yb = x,y
+                h1 = forward(xb,params,'layer1')
+                probs = forward(h1,params,'output',softmax)
+
+                # get the loss
+                loss_plus, acc_plus = compute_loss_and_acc(yb, probs)
+
+                # reset to original
+                params[k] = params_orig[k]
+
+                # subtract epsilon
+                params[k][i][j] = params_orig[k][i][j] - eps
+
+                # run the network
+                h1 = forward(xb,params,'layer1')
+                probs = forward(h1,params,'output',softmax)
+
+                # get the loss
+                loss_minus, acc_minus = compute_loss_and_acc(yb, probs)
+
+                # compute derivative with central diffs
+                grad = (loss_plus-loss_minus)/(2.*eps)
+                params['grad_'+k][i][j] = grad
+
+                # reset to original
+                params[k] = params_orig[k]
+    else:
+        for i in range(len(v)):
+            # add epsilon
+            params[k][i] = params_orig[k][i] + eps
+
+            # run the network
+            xb,yb = x,y
+            h1 = forward(xb,params,'layer1')
+            probs = forward(h1,params,'output',softmax)
+
+            # get the loss
+            loss_plus, acc_plus = compute_loss_and_acc(yb, probs)
+
+            # reset to original
+            params[k] = params_orig[k]
+
+            # subtract epsilon
+            params[k][i] = params_orig[k][i] - eps
+
+            # run the network
+            h1 = forward(xb,params,'layer1')
+            probs = forward(h1,params,'output',softmax)
+
+            # get the loss
+            loss_minus, acc_minus = compute_loss_and_acc(yb, probs)
+
+            # compute derivative with central diffs
+            grad = (loss_plus-loss_minus)/(2.*eps)
+            params['grad_'+k][i] = grad
+
+            # reset to original
+            params[k] = params_orig[k]
+
+total_error = 0
+for k in params.keys():
+    if 'grad_' in k:
+        # relative error
+        err = np.abs(params[k] - params_orig[k])/np.maximum(np.abs(params[k]),np.abs(params_orig[k]))
+        err = err.sum()
+        print('{} {:.2e}'.format(k, err))
+        total_error += err
+# should be less than 1e-4
+print('total {:.2e}'.format(total_error))
+
 # W and b should match their gradients sizes
 for k,v in sorted(list(params.items())):
     if 'grad' in k:
@@ -86,60 +178,34 @@ learning_rate = 1e-3
 # with default settings, you should get loss < 35 and accuracy > 75%
 for itr in range(max_iters):
     total_loss = 0
+    total_acc = 0
     avg_acc = 0
+    batch_count = 0
     for xb,yb in batches:
-        pass
         # forward
+        h1 = forward(xb,params,'layer1')
+        probs = forward(h1,params,'output',softmax)
 
         # loss
-        # be sure to add loss and accuracy to epoch totals 
+        # be sure to add loss and accuracy to epoch totals
+        loss, acc = compute_loss_and_acc(yb, probs)
+        batch_count += 1
+        total_loss += loss
+        total_acc += acc
+        avg_acc = total_acc/batch_count
 
         # backward
+        delta1 = probs
+        delta1[np.arange(probs.shape[0]),np.argmax(yb,axis=1)] -= 1
+        delta2 = backwards(delta1,params,'output',linear_deriv)
+        grad_X = backwards(delta2,params,'layer1',sigmoid_deriv)
 
         # apply gradient
+        params['W' + 'layer1'] = params['W' + 'layer1'] - learning_rate*params['grad_W' + 'layer1']
+        params['b' + 'layer1'] = params['b' + 'layer1'] - learning_rate*params['grad_b' + 'layer1']
+        params['W' + 'output'] = params['W' + 'output'] - learning_rate*params['grad_W' + 'output']
+        params['b' + 'output'] = params['b' + 'output'] - learning_rate*params['grad_b' + 'output']
 
-        ##########################
-        ##### your code here #####
-        ##########################
 
-        
     if itr % 100 == 0:
         print("itr: {:02d} \t loss: {:.2f} \t acc : {:.2f}".format(itr,total_loss,avg_acc))
-
-
-# Q 2.5 should be implemented in this file
-# you can do this before or after training the network. 
-
-##########################
-##### your code here #####
-##########################
-
-# save the old params
-import copy
-params_orig = copy.deepcopy(params)
-
-eps = 1e-6
-for k,v in params.items():
-    if '_' in k: 
-        continue
-    # we have a real parameter!
-    # for each value inside the parameter
-    #   add epsilon
-    #   run the network
-    #   get the loss
-    #   compute derivative with central diffs
-    
-    ##########################
-    ##### your code here #####
-    ##########################
-
-total_error = 0
-for k in params.keys():
-    if 'grad_' in k:
-        # relative error
-        err = np.abs(params[k] - params_orig[k])/np.maximum(np.abs(params[k]),np.abs(params_orig[k]))
-        err = err.sum()
-        print('{} {:.2e}'.format(k, err))
-        total_error += err
-# should be less than 1e-4
-print('total {:.2e}'.format(total_error))
